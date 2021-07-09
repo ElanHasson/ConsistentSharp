@@ -19,10 +19,11 @@ namespace ConsistentSharp
 
         public int NumberOfReplicas { get; set; } = 20;
 
-        public ConsistentHash(IHashAlgorithm hashAlgorithm = null) {
+        public ConsistentHash(IHashAlgorithm hashAlgorithm = null)
+        {
             _hashAlgorithm = hashAlgorithm ?? new Crc32HashAlgorithm();
         }
-        
+
         public IEnumerable<string> Members
         {
             get
@@ -177,11 +178,7 @@ namespace ConsistentSharp
             }
         }
 
-#if NETSTANDARD1_0
         public (string, string) GetTwo(string name)
-#else
-        public Tuple<string, string> GetTwo(string name)
-#endif
         {
             if (name == null)
             {
@@ -205,11 +202,7 @@ namespace ConsistentSharp
 
                 if (_count == 1)
                 {
-#if NETSTANDARD1_0
                     return (a, default(string));
-#else
-                    return new Tuple<string, string>(a, default(string));
-#endif
                 }
 
                 var start = i;
@@ -231,11 +224,7 @@ namespace ConsistentSharp
                     }
                 }
 
-#if NETSTANDARD1_0
                 return (a, b);
-#else
-                return new Tuple<string, string>(a, b);
-#endif
             }
             finally
             {

@@ -1,8 +1,8 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>netstandard1.0;net45;net40</TargetFrameworks>
-    <Authors>Boshi Lian</Authors>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <Authors>Elan Hasson, Boshi Lian</Authors>
     <Company />
     <Product />
     <Description>Consistent hash for dotnet core. port from go version https://github.com/stathat/consistent</Description>
@@ -13,9 +13,5 @@
     <PackageTags>Consistent hash</PackageTags>
     <Version>1.0.4</Version>
   </PropertyGroup>
-
-  <ItemGroup Condition="'$(TargetFramework)'=='netstandard1.0'">
-    <PackageReference Include="System.ValueTuple" Version="4.3.1" />
-  </ItemGroup>
-
+ 
 </Project>
