@@ -36,16 +36,11 @@ namespace ConsistentSharp.Test
             x.Add("abcdefg");
 
             Assert.AreEqual(20, x.Circle.Count);
-            Assert.AreEqual(20, x.SortedHashes.Length);
-
-            Assert.IsTrue(IsSorted(x.SortedHashes));
 
             x.Add("qwer");
 
             Assert.AreEqual(40, x.Circle.Count);
-            Assert.AreEqual(40, x.SortedHashes.Length);
 
-            Assert.IsTrue(IsSorted(x.SortedHashes));
         }
 
         [TestMethod]
@@ -56,7 +51,7 @@ namespace ConsistentSharp.Test
             x.Remove("abcdefg");
 
             Assert.AreEqual(0, x.Circle.Count);
-            Assert.AreEqual(0, x.SortedHashes.Length);
+            Assert.AreEqual(0, x.Circle.Count);
         }
 
         [TestMethod]

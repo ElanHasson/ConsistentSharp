@@ -8,42 +8,40 @@ namespace ConsistentSharp
     /// from https://github.com/stathat/consistent/blob/master/consistent.go
     public partial class ConsistentHash : IDisposable
     {
-        private readonly Dictionary<uint, string> _circle = new Dictionary<uint, string>();
-        private readonly Dictionary<string, bool> _members = new Dictionary<string, bool>();
-        private readonly ReaderWriterLockSlim _rwlock = new ReaderWriterLockSlim(LockRecursionPolicy.SupportsRecursion);
-        private readonly IHashAlgorithm _hashAlgorithm;
+        public SortedList<uint, string> Circle { get; } = new SortedList<uint, string>();
+        private readonly SortedList<string, bool> members = new SortedList<string, bool>();
+        private readonly ReaderWriterLockSlim rwlock = new ReaderWriterLockSlim(LockRecursionPolicy.SupportsRecursion);
+        private readonly IHashAlgorithm hashAlgorithm;
 
-        private long _count;
-
-        private uint[] _sortedHashes = new uint[0];
+        public long Count { get; private set; }
 
         public int NumberOfReplicas { get; set; } = 20;
 
         public ConsistentHash(IHashAlgorithm hashAlgorithm = null)
         {
-            _hashAlgorithm = hashAlgorithm ?? new Crc32HashAlgorithm();
+            this.hashAlgorithm = hashAlgorithm ?? new Crc32HashAlgorithm();
         }
 
         public IEnumerable<string> Members
         {
             get
             {
-                _rwlock.EnterReadLock();
+                rwlock.EnterReadLock();
 
                 try
                 {
-                    return _members.Keys.ToArray();
+                    return members.Keys.ToArray();
                 }
                 finally
                 {
-                    _rwlock.ExitReadLock();
+                    rwlock.ExitReadLock();
                 }
             }
         }
 
         public void Dispose()
         {
-            _rwlock.Dispose();
+            rwlock.Dispose();
         }
 
 
@@ -54,7 +52,7 @@ namespace ConsistentSharp
                 throw new ArgumentNullException(nameof(elt));
             }
 
-            _rwlock.EnterWriteLock();
+            rwlock.EnterWriteLock();
 
             try
             {
@@ -62,7 +60,7 @@ namespace ConsistentSharp
             }
             finally
             {
-                _rwlock.ExitWriteLock();
+                rwlock.ExitWriteLock();
             }
         }
 
@@ -70,12 +68,12 @@ namespace ConsistentSharp
         {
             for (var i = 0; i < NumberOfReplicas; i++)
             {
-                _circle[_hashAlgorithm.HashKey(EltKey(elt, i))] = elt;
+                Circle[hashAlgorithm.HashKey(EltKey(elt, i))] = elt;
             }
 
-            _members[elt] = true;
-            UpdateSortedHashes();
-            _count++;
+            members[elt] = true;
+            
+            Count++;
         }
 
         public void Remove(string elt)
@@ -85,14 +83,14 @@ namespace ConsistentSharp
                 throw new ArgumentNullException(nameof(elt));
             }
 
-            _rwlock.EnterWriteLock();
+            rwlock.EnterWriteLock();
             try
             {
                 _Remove(elt);
             }
             finally
             {
-                _rwlock.ExitWriteLock();
+                rwlock.ExitWriteLock();
             }
         }
 
@@ -100,12 +98,12 @@ namespace ConsistentSharp
         {
             for (var i = 0; i < NumberOfReplicas; i++)
             {
-                _circle.Remove(_hashAlgorithm.HashKey(EltKey(elt, i)));
+                Circle.Remove(hashAlgorithm.HashKey(EltKey(elt, i)));
             }
 
-            _members.Remove(elt);
-            UpdateSortedHashes();
-            _count--;
+            members.Remove(elt);
+            
+            Count--;
         }
 
         public void Set(IEnumerable<string> elts)
@@ -120,10 +118,10 @@ namespace ConsistentSharp
 
         private void _Set(string[] elts)
         {
-            _rwlock.EnterWriteLock();
+            rwlock.EnterWriteLock();
             try
             {
-                foreach (var k in _members.Keys.ToArray())
+                foreach (var k in members.Keys.ToArray())
                 {
                     var found = elts.Any(v => k == v);
 
@@ -135,7 +133,7 @@ namespace ConsistentSharp
 
                 foreach (var v in elts)
                 {
-                    if (_members.ContainsKey(v))
+                    if (members.ContainsKey(v))
                     {
                         continue;
                     }
@@ -146,7 +144,7 @@ namespace ConsistentSharp
 
             finally
             {
-                _rwlock.ExitWriteLock();
+                rwlock.ExitWriteLock();
             }
         }
 
@@ -157,24 +155,24 @@ namespace ConsistentSharp
                 throw new ArgumentNullException(nameof(name));
             }
 
-            _rwlock.EnterReadLock();
+            rwlock.EnterReadLock();
 
             try
             {
-                if (_count == 0)
+                if (Count == 0)
                 {
                     throw new EmptyCircleException();
                 }
 
-                var key = _hashAlgorithm.HashKey(name);
+                var key = hashAlgorithm.HashKey(name);
 
                 var i = Search(key);
 
-                return _circle[_sortedHashes[i]];
+                return Circle.Values[i];
             }
             finally
             {
-                _rwlock.ExitReadLock();
+                rwlock.ExitReadLock();
             }
         }
 
@@ -185,22 +183,22 @@ namespace ConsistentSharp
                 throw new ArgumentNullException(nameof(name));
             }
 
-            _rwlock.EnterReadLock();
+            rwlock.EnterReadLock();
 
             try
             {
-                if (_count == 0)
+                if (Count == 0)
                 {
                     throw new EmptyCircleException();
                 }
 
-                var key = _hashAlgorithm.HashKey(name);
+                var key = hashAlgorithm.HashKey(name);
 
                 var i = Search(key);
 
-                var a = _circle[_sortedHashes[i]];
+                var a = Circle.Values[i];
 
-                if (_count == 1)
+                if (Count == 1)
                 {
                     return (a, default(string));
                 }
@@ -211,12 +209,12 @@ namespace ConsistentSharp
 
                 for (i = start + 1; i != start; i++)
                 {
-                    if (i >= _sortedHashes.Length)
+                    if (i >= Circle.Count)
                     {
                         i = 0;
                     }
 
-                    b = _circle[_sortedHashes[i]];
+                    b = Circle.Values[i];
 
                     if (b != a)
                     {
@@ -228,7 +226,7 @@ namespace ConsistentSharp
             }
             finally
             {
-                _rwlock.ExitReadLock();
+                rwlock.ExitReadLock();
             }
         }
 
@@ -239,26 +237,26 @@ namespace ConsistentSharp
                 throw new ArgumentNullException(nameof(name));
             }
 
-            if (_count < n)
+            if (Count < n)
             {
-                n = (int) _count;
+                n = (int) Count;
             }
 
-            _rwlock.EnterReadLock();
+            rwlock.EnterReadLock();
 
             try
             {
-                if (_count == 0)
+                if (Count == 0)
                 {
                     throw new EmptyCircleException();
                 }
 
 
-                var key = _hashAlgorithm.HashKey(name);
+                var key = hashAlgorithm.HashKey(name);
                 var i = Search(key);
                 var start = i;
                 var res = new List<string>();
-                var elem = _circle[_sortedHashes[i]];
+                var elem = Circle.Values[i];
 
                 res.Add(elem);
                 if (res.Count == n)
@@ -268,12 +266,12 @@ namespace ConsistentSharp
 
                 for (i = start + 1; i != start; i++)
                 {
-                    if (i >= _sortedHashes.Length)
+                    if (i >= Circle.Count)
                     {
                         i = 0;
                     }
 
-                    elem = _circle[_sortedHashes[i]];
+                    elem = Circle.Values[i];
 
                     if (!res.Contains(elem))
                     {
@@ -290,15 +288,15 @@ namespace ConsistentSharp
             }
             finally
             {
-                _rwlock.ExitReadLock();
+                rwlock.ExitReadLock();
             }
         }
 
         private int Search(uint key)
         {
-            var i = BinarySearch(_sortedHashes.Length, x => _sortedHashes[x] > key);
+            var i = BinarySearch(Circle.Count, x => Circle.Keys[x] > key);
 
-            if (i >= _sortedHashes.Length)
+            if (i >= Circle.Count)
             {
                 i = 0;
             }
@@ -328,13 +326,6 @@ namespace ConsistentSharp
             }
 
             return s;
-        }
-
-        private void UpdateSortedHashes()
-        {
-            var hashes = _circle.Keys.ToArray();
-            Array.Sort(hashes);
-            _sortedHashes = hashes;
         }
 
         private static string EltKey(string elt, int idx)
